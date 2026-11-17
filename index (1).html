@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cartridge Slot</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --plastic: #d9d5cb;
+    --plastic-dark: #bdb8ac;
+    --ink: #25252b;
+    --indigo: #4a3fb0;
+    --screen: #14161c;
+    --text: #25252b;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --plastic: #2c2d33; --plastic-dark: #1f2025; --ink: #ecebe6; --screen: #0b0c10; --text: #ecebe6; --indigo: #8b80ff; }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; }
+  body {
+    background: var(--plastic);
+    color: var(--text);
+    font-family: "Bricolage Grotesque", system-ui, -apple-system, "Segoe UI", sans-serif;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 2rem 1rem 3rem;
+  }
+  h1 { font-weight: 800; font-size: clamp(2rem, 6vw, 3.4rem); margin: 0 0 .25rem; letter-spacing: -.02em; }
+  p.sub { margin: 0 0 1.75rem; max-width: 46ch; text-align: center; line-height: 1.5; opacity: .8; }
+
+  #slot {
+    width: min(560px, 100%);
+    border: 3px dashed var(--ink);
+    border-radius: 14px;
+    padding: 2.5rem 1.25rem;
+    text-align: center;
+    background: var(--plastic-dark);
+    cursor: pointer;
+    transition: background .15s, transform .15s;
+  }
+  #slot.over { background: var(--indigo); color: #fff; transform: scale(1.02); }
+  #slot strong { font-size: 1.3rem; display: block; margin-bottom: .4rem; }
+  #slot span { opacity: .8; font-size: .95rem; }
+
+  .row { display: flex; gap: .75rem; align-items: center; margin-top: 1rem; flex-wrap: wrap; justify-content: center; }
+  label { font-size: .95rem; }
+  select, button {
+    font: inherit; padding: .55rem .9rem; border-radius: 8px;
+    border: 2px solid var(--ink); background: var(--plastic); color: var(--text);
+  }
+  button { background: var(--indigo); color: #fff; border-color: var(--indigo); font-weight: 800; cursor: pointer; }
+  button.ghost { background: transparent; color: var(--text); border-color: var(--ink); }
+  button:focus-visible, select:focus-visible, #slot:focus-visible { outline: 3px solid var(--indigo); outline-offset: 3px; }
+
+  #msg { min-height: 1.4rem; margin-top: .9rem; font-weight: 500; }
+  #msg.err { color: #c0392b; }
+
+  #stage { display: none; width: min(960px, 100%); }
+  #stage.on { display: block; }
+  #screen { width: 100%; aspect-ratio: 4 / 3; max-height: 75vh; background: var(--screen); border-radius: 10px; overflow: hidden; }
+  #stage .row { margin-top: .75rem; }
+
+  details { margin-top: 2rem; max-width: 560px; width: 100%; line-height: 1.5; }
+  summary { cursor: pointer; font-weight: 800; }
+  details p, details li { font-size: .95rem; opacity: .85; }
+  @media (prefers-reduced-motion: reduce) { #slot { transition: none; } }
+</style>
+</head>
+<body>
+  <h1>Cartridge Slot</h1>
+  <p class="sub">Drop in a game file you own and play it in your browser. Nothing gets uploaded; it all runs on your computer.</p>
+
+  <div id="picker" style="width:min(560px,100%)">
+    <div id="slot" tabindex="0" role="button" aria-label="Choose a game file">
+      <strong>Drop a game file here</strong>
+      <span>or click to browse (.nes .sfc .smc .gb .gbc .gba .n64 .z64 .nds .md .gen .sms .gg .a26 .pce)</span>
+    </div>
+    <input id="file" type="file" hidden>
+    <div class="row">
+      <label for="core">System:</label>
+      <select id="core">
+        <option value="auto">Auto-detect from file</option>
+        <option value="nes">NES</option>
+        <option value="snes">Super Nintendo</option>
+        <option value="gb">Game Boy / Game Boy Color</option>
+        <option value="gba">Game Boy Advance</option>
+        <option value="n64">Nintendo 64</option>
+        <option value="nds">Nintendo DS</option>
+        <option value="segaMD">Sega Genesis / Mega Drive</option>
+        <option value="segaMS">Sega Master System</option>
+        <option value="segaGG">Sega Game Gear</option>
+        <option value="atari2600">Atari 2600</option>
+        <option value="pce">TurboGrafx-16</option>
+      </select>
+    </div>
+    <div id="msg" role="status"></div>
+  </div>
+
+  <div id="stage">
+    <div id="screen"></div>
+    <div class="row">
+      <button class="ghost" id="again">Load a different game</button>
+    </div>
+  </div>
+
+  <details>
+    <summary>Controls and tips</summary>
+    <ul>
+      <li>Keyboard defaults: arrow keys to move, X / Z / A / S for buttons, Enter for Start, Shift for Select. Gamepads work too.</li>
+      <li>Use the bar under the game to save states, rebind keys, go fullscreen, or turn on cheats.</li>
+      <li>N64 and DS games run heavy. Chrome or Edge on a decent computer works best.</li>
+    </ul>
+  </details>
+
+<script>
+  var EXT = {
+    nes:"nes", fds:"nes", sfc:"snes", smc:"snes", gb:"gb", gbc:"gb", gba:"gba",
+    n64:"n64", z64:"n64", v64:"n64", nds:"nds", md:"segaMD", gen:"segaMD", smd:"segaMD",
+    sms:"segaMS", gg:"segaGG", a26:"atari2600", pce:"pce"
+  };
+  var slot = document.getElementById("slot");
+  var fileInput = document.getElementById("file");
+  var msg = document.getElementById("msg");
+
+  function say(t, bad) { msg.textContent = t; msg.className = bad ? "err" : ""; }
+
+  slot.addEventListener("click", function () { fileInput.click(); });
+  slot.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fileInput.click(); } });
+  fileInput.addEventListener("change", function () { if (fileInput.files[0]) start(fileInput.files[0]); });
+  ["dragenter", "dragover"].forEach(function (n) {
+    slot.addEventListener(n, function (e) { e.preventDefault(); slot.classList.add("over"); });
+  });
+  ["dragleave", "drop"].forEach(function (n) {
+    slot.addEventListener(n, function (e) { e.preventDefault(); slot.classList.remove("over"); });
+  });
+  slot.addEventListener("drop", function (e) { if (e.dataTransfer.files[0]) start(e.dataTransfer.files[0]); });
+  document.getElementById("again").addEventListener("click", function () { location.reload(); });
+
+  function start(file) {
+    var ext = file.name.split(".").pop().toLowerCase();
+    var pick = document.getElementById("core").value;
+    var core = pick === "auto" ? EXT[ext] : pick;
+
+    if (ext === "zip" && pick === "auto") { say("That is a zip file, so choose the system from the dropdown first, then try again.", true); return; }
+    if (!core) { say("Could not tell which system \"." + ext + "\" is for. Pick one from the dropdown and try again.", true); return; }
+
+    document.getElementById("picker").style.display = "none";
+    document.getElementById("stage").classList.add("on");
+
+    window.EJS_player = "#screen";
+    window.EJS_core = core;
+    window.EJS_gameUrl = URL.createObjectURL(file);
+    window.EJS_gameName = file.name.replace(/\.[^.]+$/, "");
+    window.EJS_pathtodata = "https://cdn.emulatorjs.org/stable/data/";
+    window.EJS_startOnLoaded = true;
+    window.EJS_color = "#4a3fb0";
+
+    var s = document.createElement("script");
+    s.src = "https://cdn.emulatorjs.org/stable/data/loader.js";
+    s.onerror = function () {
+      document.getElementById("screen").textContent = "Could not load the emulator. Check your internet connection, and make sure you opened this page through a web address (see the setup steps) rather than by double-clicking the file.";
+    };
+    document.body.appendChild(s);
+  }
+</script>
+</body>
+</html>
